@@ -10,9 +10,11 @@ cv::Mat cvt_trans_mat_to_cvmat(double ar_trans_mat[3][4]);
 void copy_trans_array(double src[4][4], double dest[][4]);
 cv::Mat extract_rotation_mat(cv::Mat input);
 
-// coverting index for voxel pointing
+// coverting index
 int get_voxel_index(int x, int y, int z);
 void get_voxel_coord(int index, int output[3]);
+void set_candidate_index(int index[pitch_points][yaw_points]);
+void get_adjecent_candidate_index(int candidate_index, int output[4]);
 
 // camera move recommendation
 int get_acam_start_index(int pitch_layer, int total_acam);
@@ -27,6 +29,7 @@ float cal_3d_distance(cv::Mat first_point, cv::Mat second_point);
 float cal_3d_sqr_distance(cv::Mat first_point, cv::Mat second_point);
 float cal_color3c_sqr_distance(cv::Vec3b first_color, cv::Vec3b second_color);
 float cal_3d_point2line_distance(cv::Mat l_first_point, cv::Mat l_second_point, cv::Mat point);
+cv::Mat cal_3d_point2line_intersect(cv::Mat l_first_point, cv::Mat l_second_point, cv::Mat point);
 
 // some mathematic utilities
 float var(float mean, std::vector<float> data);

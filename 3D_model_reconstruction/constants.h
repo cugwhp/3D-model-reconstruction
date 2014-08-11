@@ -29,17 +29,6 @@ const int last_voxel_y = (first_voxel_y + voxel_y) - 1;		// the co-ordinate on y
 const int last_voxel_z = (first_voxel_z + voxel_z) - 1;		// the co-ordinate on z axis of last voxels to be drawn
 const int total_voxel = voxel_x * voxel_y * voxel_z;		// total number of voxels
 
-//voxels carving and texture mapping
-const float acam_rec_sphere_radius = 1000.0;	// the radius of the sphere of all acam recommended position
-const int yaw_points = 15;						// the number of points in each layer of pitch
-const int pitch_points = 5;						// the number of points in each layer of yaw
-const float starting_pitch = 15.0;				// pitch of the first layer of recommended actual camera
-const int reduce_yaw_step = 3;					// subtract the number of points for every pitch layer drawn, the higher the pitch the lower amount of points
-const int capture_trigger_distance = 50*50;		// the square distance between camera and acam recommended view need to be less than this value to trigger image capturing
-
-const int carving_pitch = 2;					// the decided layer to guide the user for voxel carving process
-const float pitch_threshold = 5;				// how far allow for the user's camera from the voxel carving pitch in order to continue carving process
-
 
 /************************************************
         +-------------------------------+
@@ -84,5 +73,14 @@ const float image_weight[image_count] = { 1.5, 1.0, 0.5 };	// weight for each im
 	   +-----------------------------+
 ************************************************/
 
+const float acam_rec_sphere_radius = 350.0;			// the radius of the sphere of all acam recommended position
+const int yaw_points = 15;							// the number of points in each layer of pitch
+const int pitch_points = 5;							// the number of points in each layer of yaw
+const float starting_pitch = 15.0;					// pitch of the first layer of recommended actual camera
+const int reduce_yaw_step = 3;						// subtract the number of points for every pitch layer drawn, the higher the pitch the lower amount of points
+const int capture_trigger_distance = 50 * 50;		// the square distance between camera and acam recommended view need to be less than this value to trigger image capturing
+const int carving_pitch = 2;						// the decided layer to guide the user for voxel carving process
+const float pitch_threshold = 5;					// the width of each pitch layer, define by layer center plus/minus pitch threshold
+
 const int var_error_checking_percentile = 90;		// percentile of the variances that use to decide the color consistency
-const float color_error_threshold = 10;				// [TODO] a view cosider as not need to capture if the variance is less than this
+const float color_error_threshold = 50 * 50;		// [TODO] a view cosider as not need to capture if the variance is less than this

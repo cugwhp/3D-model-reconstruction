@@ -21,6 +21,7 @@ using namespace cv;
 vector<Mat> a_cam_views;								// contains all of the translation mat for all captured view in MARKER CS
 vector<Mat> a_cam_images;								// contains all of the images captured so far NOTE: the index is coresponding to a_cam_views
 vector<Mat> recommended_acam;							// list of defined virtual camera transformation matrix in MARKER CS
+vector<Mat> voxel_2D_vec_capture;
 
 vector<bool> is_captured;								// [flag] true when that view is already captured
 vector<bool> should_capture;							// [flag] true when that view is worth capture
@@ -29,6 +30,9 @@ bool pitch_layer_done[pitch_points];					// [flag] true if all of recommended vi
 bool is_capturing_done = false;							// [flag] all of the layer are complete
 int recommended_layer = carving_pitch;					// recommended pitch layer
 int captured_count = 0;									// how many the images captured so far
+
+int depth_voxel_id_capture[prefHeight][prefWidth];				// the id is start at 0, -1 for not having any voxel
+float depth_map_capture[prefHeight][prefWidth];					// the depth value of each voxel in specific frame
 
 // find the closest recommended acam view based on current user's camera position
 // also capture the image if the distance between user's camera and the closest recommended camera is less than capture_trigger_distance
@@ -73,16 +77,17 @@ void capture_image(Mat current_cam, Mat current_frame, int closest_rec_acam_inde
 // for all pixels, calculate the variance from the 3 images that are closest
 // if the variance is low enough, don't have to capture from that point.
 void should_capture_or_not() {
+	vector<Mat>* camera_views = get_all_camera_view();
+	if (camera_views->size() < 3) return;
+	vector<Mat>* captured_images = get_all_captured_image();
+	vector<float> variances;
+	cal_voxel2D();
+
 	for (int i = 0; i < recommended_acam.size(); i++) {
-		int depth_voxel_id[prefHeight][prefWidth];		// the id is start at 0, -1 for not having any voxel
-		float depth_map[prefHeight][prefWidth];		// the depth value of each voxel in specific frame
-		Mat current_candidate = recommended_acam.at(i);
-		vector<Mat>* camera_views = get_all_camera_view();
-		vector<Mat>* captured_images = get_all_captured_image();
-		vector<Mat>* voxel_2D_vec = cal_voxel2D();
-		vector<float> variances;
+		std::cout << i << std::endl;
+		Mat current_candidate = recommended_acam.at(i).inv();
 		
-		construct_depth_map(current_candidate, depth_voxel_id, depth_map);
+		construct_depth_map(current_candidate, depth_voxel_id_capture, depth_map_capture);
 		
 		// c values used for computing 3 closest camera views
 		vector<float> c_values;
@@ -90,21 +95,23 @@ void should_capture_or_not() {
 			float c = cal_3d_sqr_distance(camera_views->at(j), current_candidate);
 			c_values.push_back(c);
 		}
-
+		
 		// loop though the depth_id map of the candidate view
 		for (int y = 0; y < prefHeight; y++) {
 			for (int x = 0; x < prefWidth; x++) {
-				if (depth_voxel_id[y][x] == -1) continue;
+				if (depth_voxel_id_capture[y][x] == -1) continue;
 				// find 3 closest actual camera view and image
-				int voxel_id = depth_voxel_id[y][x];
+				int voxel_id = depth_voxel_id_capture[y][x];
 				vector<int> c_index = find_closest_view_optimized(voxel_id, current_candidate, -1, c_values);
 
 				// get the color from 3 closest actual views
-				vector<vector<float>> colors;
+				vector<float> r_val;
+				vector<float> g_val;
+				vector<float> b_val;
 				int r = 0, g = 0, b = 0;
 				for (int i = 0; i < 3; i++) {
 					Mat closest_image = captured_images->at(c_index[i]);
-					Mat voxel_2D = voxel_2D_vec->at(c_index[i]).col(voxel_id);
+					Mat voxel_2D = voxel_2D_vec_capture.at(c_index[i]).col(voxel_id);
 					int image_x_loc = round(voxel_2D.at<float>(0, 0));
 					int image_y_loc = round(voxel_2D.at<float>(1, 0));
 					if (image_x_loc < 0 || image_y_loc < 0 || image_x_loc > prefWidth - 1 || image_y_loc > prefHeight - 1) continue;
@@ -113,34 +120,37 @@ void should_capture_or_not() {
 					r += new_color.val[2];
 					g += new_color.val[1];
 					b += new_color.val[0];
-					colors.at(0).push_back(new_color.val[2]);
-					colors.at(1).push_back(new_color.val[1]);
-					colors.at(2).push_back(new_color.val[0]);
+					r_val.push_back(new_color.val[2]);
+					g_val.push_back(new_color.val[1]);
+					b_val.push_back(new_color.val[0]);
 				}
 
 				// calculate variance
-				variances.push_back(var(r / 3, colors[0]));
-				variances.push_back(var(g / 3, colors[1]));
-				variances.push_back(var(b / 3, colors[2]));
+				variances.push_back(var(r / 3, r_val));
+				variances.push_back(var(g / 3, g_val));
+				variances.push_back(var(b / 3, b_val));
 			}
 		}
 
 		// compare (var_error_checking_percentile)th with color_error_threshold to make a decision
 		std::sort(variances.begin(), variances.end());
-		if (percentile(var_error_checking_percentile, variances) < color_error_threshold) should_capture[i] = false;
+		float temp = percentile(var_error_checking_percentile, variances);
+		if (temp < color_error_threshold) {
+			//should_capture[i] = false;
+			std::cout << temp << std::endl;
+			is_captured[i] = true;
+			captured_count++;
+		}
 	}
 }
 
-vector<Mat>* cal_voxel2D() {
+void cal_voxel2D() {
 	Mat voxel_3D = get_voxels();
 	vector<Mat>* camera_views = get_all_camera_view();
-	vector<Mat> voxel_2D_vec;
 
 	for (int i = 0; i < camera_views->size(); ++i){
-		voxel_2D_vec.push_back(cvt_3dPoints_2dPoints_cvmat(voxel_3D, (*camera_views)[i].inv(), get_camera_matrix()));
+		voxel_2D_vec_capture.push_back(cvt_3dPoints_2dPoints_cvmat(voxel_3D, (*camera_views)[i].inv(), get_camera_matrix()));
 	}
-
-	return &voxel_2D_vec;
 }
 
 // suggest the direction for the user to move his camera

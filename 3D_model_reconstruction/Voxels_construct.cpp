@@ -167,33 +167,16 @@ void shape_voxels(Mat image, Mat voxels2D, Mat silhouette) {
 
 //construct a depth map and depth id based on the camera views
 void construct_depth_map(Mat cam_view, int depth_voxel_id[][prefWidth], float depth_map[][prefWidth]) {
-	clock_t time = clock();
-	clock_t time_d = clock();
 	Mat voxel_3D = get_voxels();
-	clock_t time_d2 = clock();
-	std::cout << "        depth map: get_voxels() " << time_d2 - time_d << std::endl;
-	time_d = clock();
 	Mat voxel_2D = cam_view * voxel_3D;
-	time_d2 = clock();
-	std::cout << "        depth map: matrix mul " << time_d2 - time_d << std::endl;
-	time_d = clock();
 	Mat z_value_of_voxels = voxel_2D.row(2).clone();
-	time_d2 = clock();
-	std::cout << "        depth map: z value - matrix cloning " << time_d2 - time_d << std::endl;
-	time_d = clock();
-	//voxel_2D = cvt_3dPoints_2dPoints_cvmat(voxel_3D, cam_view, get_camera_matrix());
 	voxel_2D = get_camera_matrix() * voxel_2D;
 	cv::divide(voxel_2D.row(0), voxel_2D.row(2), voxel_2D.row(0));
 	cv::divide(voxel_2D.row(1), voxel_2D.row(2), voxel_2D.row(1));
-	time_d2 = clock();
-	std::cout << "        depth map: cvt_3dPoints_2dPoints_cvmat() " << time_d2 - time_d << std::endl;
-	clock_t time_2 = clock();
-	std::cout << "    depth map: preparing voxel used " << time_2 - time << std::endl;
 
 	//- DEBUG -
 	Mat depth(480, 640, CV_8UC1, Scalar(0));
 
-	time = clock();
 	//reset the depth_map array and depth_voxel_id array
 	for (int i = 0; i < prefHeight; i++) {
 		for (int j = 0; j < prefWidth; j++) {
@@ -201,11 +184,7 @@ void construct_depth_map(Mat cam_view, int depth_voxel_id[][prefWidth], float de
 			depth_voxel_id[i][j] = -1;
 		}
 	}
-	time_2 = clock();
-	std::cout << "    depth map: re-initialize array " << time_2 - time << std::endl;
-	
-	time = clock();
-	long sum = 0;
+
 	for (int i = 0; i < total_voxel; i++) {
 		//if voxel is not valid, don't do anything
 		if (!voxel_valid[i]) continue;
@@ -216,7 +195,6 @@ void construct_depth_map(Mat cam_view, int depth_voxel_id[][prefWidth], float de
 		if (x < 0 || y < 0) continue;
 		if (x > prefWidth - 1 || y > prefHeight - 1) continue;
 
-		clock_t time_l = clock();
 		//draw a square centered at the voxel
 		for (int j = -voxel_size / 2; j < voxel_size / 2; j++) {
 			for (int k = -voxel_size / 2; k < voxel_size / 2; k++) {
@@ -242,14 +220,10 @@ void construct_depth_map(Mat cam_view, int depth_voxel_id[][prefWidth], float de
 				}
 			}
 		}
-		clock_t time_l2 = clock();
-		sum += time_l2 - time_l;
 	}
-	time_2 = clock();
-	std::cout << "    depth map: whole calculation " << time_2 - time << std::endl;
-	std::cout << "        depth map: filling square in depth map " << sum << std::endl;
 
-	//show_image("depth map", depth);
+	show_image("depth map", depth);
+	waitKey(10);
 }
 
 void vd_color_voxel(vector<Mat> cam_views, vector<Mat> images, int id, int x, int y) {

@@ -7,7 +7,7 @@ void capture_image(cv::Mat current_cam, cv::Mat current_frame, int closest_rec_a
 int suggest_direction(cv::Mat current_view);
 
 void should_capture_or_not();
-std::vector<cv::Mat>* cal_voxel2D();
+void cal_voxel2D();
 
 std::vector<cv::Mat>* get_all_camera_view();
 std::vector<cv::Mat>* get_all_captured_image();

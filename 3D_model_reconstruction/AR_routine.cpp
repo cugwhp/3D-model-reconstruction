@@ -362,6 +362,8 @@ void image_capturing_routine() {
 
 			find_closest_acam(current_view, current_frame_cvmat.clone());
 			suggested_direction = suggest_direction(current_view);
+			update_voxel_validity();
+			should_capture_or_not();
 		}
 	}
 }

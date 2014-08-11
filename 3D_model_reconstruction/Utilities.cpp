@@ -9,6 +9,7 @@
 
 using namespace cv;
 
+int candidate_index[pitch_points][yaw_points];
 
 // ************************************************************************
 // voxel and translation matrix based operation
@@ -97,7 +98,7 @@ Mat extract_rotation_mat(Mat input) {
 
 
 // ************************************************************************
-// coverting index for voxel pointing
+// coverting index
 // ************************************************************************
 
 int get_voxel_index(int x, int y, int z) {
@@ -114,6 +115,18 @@ void get_voxel_coord(int index, int output[3]) {
 	output[0] = x;
 	output[1] = y;
 	output[2] = z;
+}
+
+void set_candidate_index(int index[pitch_points][yaw_points]) {
+	for (int i = 0; i < pitch_points; i++) {
+		for (int j = 0; j < yaw_points; j++) {
+			candidate_index[i][j] = index[i][j];
+		}
+	}
+}
+
+void get_adjecent_candidate_index(int candidate_index, int output[4]) {
+
 }
 
 
@@ -231,6 +244,17 @@ float cal_3d_point2line_distance(Mat l_first_point, Mat l_second_point, Mat poin
 
 	Mat norm = point - (l_first_point + b * v);
 	return norm.dot(norm);
+}
+
+Mat cal_3d_point2line_intersect(Mat l_first_point, Mat l_second_point, Mat point) {
+	Mat v = l_second_point - l_first_point;
+	Mat w = point - l_first_point;
+
+	double c1 = w.dot(v);
+	double c2 = v.dot(v);
+	double b = c1 / c2;
+
+	return l_first_point + b * v;
 }
 
 
