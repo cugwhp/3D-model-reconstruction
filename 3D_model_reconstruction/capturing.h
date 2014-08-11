@@ -1,5 +1,5 @@
 #pragma once
-#include <opencv2/core/core.hpp>
+#include <opencv2/opencv.hpp>
 
 void define_acam_recommendation();
 void find_closest_acam(cv::Mat current_cam, cv::Mat current_frame);

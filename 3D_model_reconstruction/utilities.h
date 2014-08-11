@@ -1,5 +1,5 @@
 #pragma once
-#include <opencv2/core/core.hpp>
+#include <opencv2/opencv.hpp>
 
 // voxel and translation matrix based operation
 cv::Mat cvt_3dPoints_2dPoints_array(cv::Mat points, double marker_trans[3][4], double camera_matrix[3][4]);

@@ -3,8 +3,7 @@
 #include <iostream>
 #include <math.h>
 #include <ctime>
-#include <opencv2/core/core.hpp>
-#include <opencv2/highgui/highgui.hpp>
+#include <opencv2/opencv.hpp>
 #include "utilities.h"
 #include "constants.h"
 

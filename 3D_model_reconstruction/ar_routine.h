@@ -1,5 +1,5 @@
 #pragma once
-#include <opencv2/core/core.hpp>
+#include <opencv2/opencv.hpp>
 #include <AR/gsub_lite.h>
 
 void camera_set_context(ARGL_CONTEXT_SETTINGS_REF arContext);

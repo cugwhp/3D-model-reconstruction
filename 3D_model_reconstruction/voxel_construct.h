@@ -1,6 +1,6 @@
 #pragma once
 #include "constants.h"
-#include <opencv2/core/core.hpp>
+#include <opencv2/opencv.hpp>
 
 void init_voxels_hp();
 void define_virtual_cam();

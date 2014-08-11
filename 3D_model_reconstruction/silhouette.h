@@ -1,5 +1,5 @@
 #pragma once
-#include <opencv2/core/core.hpp>
+#include <opencv2/opencv.hpp>
 
 cv::Mat create_silhouette(cv::Mat);
 bool determine_bgColor(cv::Mat image);
