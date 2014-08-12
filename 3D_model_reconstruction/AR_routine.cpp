@@ -233,11 +233,13 @@ void draw() {
 	glPointSize(10.0f);
 	glBegin(GL_LINES);
 	vector<Mat>* recommended_acam = get_recommended_acam();
+	vector<int> in_range = find_candidate_in_range(cvt_trans_mat_to_cvmat(multimarker_info->trans).inv());
 	for (int i = 0; i < recommended_acam->size(); i++) {
 		Mat v_cam = recommended_acam->at(i);
-		if (get_is_captured_at(i)) continue;
-		if (i == closest_v_cam_index) glColor3ub(255, 180, 180);
-		else glColor3ub(255, 60, 60);
+		if (get_is_captured_at(i) && get_should_capture_at(i)) glColor3ub(0, 255, 0);
+		else if (contains(in_range, i)) glColor3ub(255, 255, 255);
+		else if (!get_should_capture_at(i)) glColor3ub(0, 0, 255);
+		else glColor3ub(255, 66, 66);
 		glVertex3f(v_cam.at<float>(0, 3), v_cam.at<float>(1, 3), v_cam.at<float>(2, 3));
 		glVertex3f(0, 0, 0);
 	}
@@ -362,9 +364,15 @@ void image_capturing_routine() {
 
 			find_closest_acam(current_view, current_frame_cvmat.clone());
 			suggested_direction = suggest_direction(current_view);
-			update_voxel_validity();
-			should_capture_or_not();
 		}
+	}
+}
+
+void should_capture_routine() {
+	for (;;) {
+		if (patt_found && !is_mapping)
+		update_voxel_validity();
+		should_capture_or_not(cvt_trans_mat_to_cvmat(multimarker_info->trans).inv());
 	}
 }
 

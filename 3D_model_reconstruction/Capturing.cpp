@@ -1,6 +1,8 @@
 #include <stdlib.h>
 #include <iostream>
 #include <math.h>
+#include <mutex>
+#include <queue>
 #include <opencv2/opencv.hpp>
 
 #include "capturing.h"
@@ -21,7 +23,10 @@ using namespace cv;
 vector<Mat> a_cam_views;								// contains all of the translation mat for all captured view in MARKER CS
 vector<Mat> a_cam_images;								// contains all of the images captured so far NOTE: the index is coresponding to a_cam_views
 vector<Mat> recommended_acam;							// list of defined virtual camera transformation matrix in MARKER CS
-vector<Mat> voxel_2D_vec_capture;
+vector<Mat> in_range_voxel_2D;
+std::queue<Mat> a_cam_views_q;
+std::queue<Mat> a_cam_images_q;
+std::mutex mtx;
 
 vector<bool> is_captured;								// [flag] true when that view is already captured
 vector<bool> should_capture;							// [flag] true when that view is worth capture
@@ -31,8 +36,13 @@ bool is_capturing_done = false;							// [flag] all of the layer are complete
 int recommended_layer = carving_pitch;					// recommended pitch layer
 int captured_count = 0;									// how many the images captured so far
 
-int depth_voxel_id_capture[prefHeight][prefWidth];				// the id is start at 0, -1 for not having any voxel
-float depth_map_capture[prefHeight][prefWidth];					// the depth value of each voxel in specific frame
+int depth_voxel_id_capture[prefHeight][prefWidth];		// the id is start at 0, -1 for not having any voxel
+float depth_map_capture[prefHeight][prefWidth];			// the depth value of each voxel in specific frame
+
+
+vector<Mat> voxel_2D_vec_temp;
+
+
 
 // find the closest recommended acam view based on current user's camera position
 // also capture the image if the distance between user's camera and the closest recommended camera is less than capture_trigger_distance
@@ -66,33 +76,65 @@ void find_closest_acam(Mat current_cam, Mat current_frame) {
 // this function called by find_closest_acam
 // called when the user's camera and the closest recommended camera is close enough
 void capture_image(Mat current_cam, Mat current_frame, int closest_rec_acam_index) {
-	a_cam_views.push_back(current_cam);
-	a_cam_images.push_back(current_frame);
+	//a_cam_views.push_back(current_cam);
+	//a_cam_images.push_back(current_frame);
+	a_cam_views_q.push(current_cam);
+	a_cam_images_q.push(current_frame);
 	is_captured[closest_rec_acam_index] = true;
 	captured_count++;
+}
+
+void transfer() {
+	for (;;) {
+		Mat cam, img;
+		mtx.lock();
+		if (!a_cam_views_q.empty()) {
+			cam = a_cam_views_q.front();
+			a_cam_views_q.pop();
+			a_cam_views.push_back(cam);
+		}
+
+		if (!a_cam_images_q.empty()) {
+			img = a_cam_images_q.front();
+			a_cam_images_q.pop();
+			a_cam_images.push_back(img);
+		}
+		
+		mtx.unlock();
+	}
 }
 
 // decide whether to capture this view or not
 // generate a virtual image from the candidate 
 // for all pixels, calculate the variance from the 3 images that are closest
 // if the variance is low enough, don't have to capture from that point.
-void should_capture_or_not() {
-	vector<Mat>* camera_views = get_all_camera_view();
-	if (camera_views->size() < 3) return;
-	vector<Mat>* captured_images = get_all_captured_image();
+void should_capture_or_not(Mat user_camera_position) {
+	if (a_cam_views.size() < 3) return;
+	
+	vector<int> candidate_in_range = find_candidate_in_range(user_camera_position);
+	vector<int> acam_in_range = find_acam_in_range(user_camera_position);
+	if (acam_in_range.empty()) return;
+	cal_voxel2D(acam_in_range);
 	vector<float> variances;
-	cal_voxel2D();
 
-	for (int i = 0; i < recommended_acam.size(); i++) {
-		std::cout << i << std::endl;
-		Mat current_candidate = recommended_acam.at(i).inv();
+	std::cout << candidate_in_range.size() << " candidate in range" << std::endl;
+	std::cout << acam_in_range.size() << " acam in range" << std::endl;
+
+	mtx.lock();
+	//voxel2D();
+	int count = 0;
+	for (int i = 0; i < candidate_in_range.size(); i++) {
+		int current_rec_cam = candidate_in_range.at(i);
+		//std::cout << "rec_cam id " << current_rec_cam << std::endl;
+		Mat current_candidate = recommended_acam.at(current_rec_cam).inv();
+		//vd_texture_mapping_temp(current_candidate);
 		
 		construct_depth_map(current_candidate, depth_voxel_id_capture, depth_map_capture);
 		
 		// c values used for computing 3 closest camera views
 		vector<float> c_values;
-		for (int j = 0; j < camera_views->size(); j++) {
-			float c = cal_3d_sqr_distance(camera_views->at(j), current_candidate);
+		for (int j = 0; j < acam_in_range.size(); j++) {
+			float c = cal_3d_sqr_distance(a_cam_views.at(acam_in_range.at(j)), current_candidate);
 			c_values.push_back(c);
 		}
 		
@@ -102,7 +144,7 @@ void should_capture_or_not() {
 				if (depth_voxel_id_capture[y][x] == -1) continue;
 				// find 3 closest actual camera view and image
 				int voxel_id = depth_voxel_id_capture[y][x];
-				vector<int> c_index = find_closest_view_optimized(voxel_id, current_candidate, -1, c_values);
+				vector<int> c_index = find_closest_view_ranged(voxel_id, current_candidate, c_values, acam_in_range);
 
 				// get the color from 3 closest actual views
 				vector<float> r_val;
@@ -110,10 +152,10 @@ void should_capture_or_not() {
 				vector<float> b_val;
 				int r = 0, g = 0, b = 0;
 				for (int i = 0; i < 3; i++) {
-					Mat closest_image = captured_images->at(c_index[i]);
-					Mat voxel_2D = voxel_2D_vec_capture.at(c_index[i]).col(voxel_id);
-					int image_x_loc = round(voxel_2D.at<float>(0, 0));
-					int image_y_loc = round(voxel_2D.at<float>(1, 0));
+					Mat closest_image = a_cam_images.at(c_index[i]);
+					Mat voxel_2D = in_range_voxel_2D.at(c_index[i]).col(voxel_id);
+					int image_x_loc = voxel_2D.at<float>(0, 0);
+					int image_y_loc = voxel_2D.at<float>(1, 0);
 					if (image_x_loc < 0 || image_y_loc < 0 || image_x_loc > prefWidth - 1 || image_y_loc > prefHeight - 1) continue;
 
 					Vec3b new_color = closest_image.at<Vec3b>(image_y_loc, image_x_loc);
@@ -134,23 +176,98 @@ void should_capture_or_not() {
 
 		// compare (var_error_checking_percentile)th with color_error_threshold to make a decision
 		std::sort(variances.begin(), variances.end());
-		float temp = percentile(var_error_checking_percentile, variances);
+		float temp = variances[percentile(var_error_checking_percentile, variances)];
+		std::cout << "per " << temp << std::endl;
 		if (temp < color_error_threshold) {
-			//should_capture[i] = false;
-			std::cout << temp << std::endl;
+			should_capture[i] = false;
 			is_captured[i] = true;
 			captured_count++;
+			count++;
 		}
+	}
+	std::cout << count << " rec cam has marked as not nes" << std::endl;
+	mtx.unlock();
+}
+
+void cal_voxel2D(vector<int> range) {
+	Mat voxel_3D = get_voxels();
+	in_range_voxel_2D.clear();
+
+	for (int i = 0; i < range.size(); ++i){
+		in_range_voxel_2D.push_back(cvt_3dPoints_2dPoints_cvmat(voxel_3D, a_cam_views[range[i]].inv(), get_camera_matrix()));
 	}
 }
 
-void cal_voxel2D() {
-	Mat voxel_3D = get_voxels();
-	vector<Mat>* camera_views = get_all_camera_view();
-
-	for (int i = 0; i < camera_views->size(); ++i){
-		voxel_2D_vec_capture.push_back(cvt_3dPoints_2dPoints_cvmat(voxel_3D, (*camera_views)[i].inv(), get_camera_matrix()));
+vector<int> find_candidate_in_range(Mat user_cam_position) {
+	vector<float> distances;
+	vector<int> candidate_in_range;
+	Mat zero(3, 1, CV_32F, 0);
+	for (int i = 0; i < recommended_acam.size(); i++) {
+		if (is_captured[i]) continue;
+		distances.push_back(cal_3d_sqr_distance(recommended_acam[i].col(3), user_cam_position.col(3)));
+		//distances.push_back(cal_3d_point2line_distance(zero, recommended_acam.at(i).col(3), user_cam_position.col(3)));
 	}
+
+	for (int i = 0; i < distances.size(); i++) {
+		if (distances[i] < candidate_distance) candidate_in_range.push_back(i);
+	}
+
+	return candidate_in_range;
+}
+
+vector<int> find_acam_in_range(Mat user_cam_position) {
+	vector<float> distances;
+	vector<int> acam_in_range;
+	Mat zero(3, 1, CV_32F, 0);
+	for (int i = 0; i < a_cam_views.size(); i++) {
+		//if (is_captured[i]) continue;
+		distances.push_back(cal_3d_sqr_distance(a_cam_views.at(i).col(3), user_cam_position.col(3)));
+	}
+
+	for (int i = 0; i < distances.size(); i++) {
+		if (distances[i] < candidate_distance) acam_in_range.push_back(i);
+	}
+
+	return acam_in_range;
+}
+
+vector<int> find_closest_view_ranged(int voxel_id, Mat v_cam, vector<float> c_values, vector<int> range) {
+	vector<float> closest_deg(image_count);
+	vector<int> closest_index(image_count);
+	for (int i = 0; i < image_count; i++) {
+		closest_deg[i] = 999999;
+	}
+	//get all ACTUAL camera views and accquire 3D voxel location both of these are in MARKER CS
+	Mat voxel_location = get_voxels().col(voxel_id);
+
+	float a = cal_3d_sqr_distance(v_cam, voxel_location);
+	for (int i = 0; i < range.size(); i++) {
+		Mat current_actual_view = a_cam_views.at(range[i]);
+		float b = cal_3d_sqr_distance(current_actual_view, voxel_location);
+		float c = c_values.at(i);
+
+		//use cosine law
+		float angle = ((a)+(b)-(c)) / (2 * sqrt((a*b)));
+		angle = rad_to_deg(acos(angle));
+
+		for (int j = 0; j < image_count; j++) {
+			if (angle < closest_deg[j]) {
+				if (closest_deg[j] != 999999) {
+					for (int k = image_count - 1; k >= j; k--) {
+						if (k + 1 >= image_count) continue;
+						closest_deg[k + 1] = closest_deg[k];
+						closest_index[k + 1] = closest_index[k];
+
+					}
+				}
+				closest_deg[j] = angle;
+				closest_index[j] = i;
+				break;
+			}
+		}
+	}
+
+	return closest_index;
 }
 
 // suggest the direction for the user to move his camera
@@ -228,6 +345,7 @@ void define_acam_recommendation() {
 
 			recommended_acam.push_back(acam_recommended);
 			is_captured.push_back(false);
+			should_capture.push_back(true);
 		}
 		current_yaw_point -= reduce_yaw_step;
 	}
@@ -247,6 +365,7 @@ void define_acam_recommendation() {
 	Mat acam_recommended = cal_trans_mat(0, pitch, yaw, x, y, z);
 	recommended_acam.push_back(acam_recommended);
 	is_captured.push_back(false);
+	should_capture.push_back(true);
 }
 
 //return all of the captured views in MARKER CS
@@ -264,4 +383,9 @@ vector<Mat>* get_recommended_acam() {
 
 bool get_is_captured_at(int index) {
 	return is_captured[index];
+}
+
+bool get_should_capture_at(int index) {
+	if (should_capture.empty()) return true;
+	return should_capture[index];
 }

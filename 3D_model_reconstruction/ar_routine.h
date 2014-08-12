@@ -17,6 +17,7 @@ void reshape(int, int);
 
 void voxel_carving_routine();
 void image_capturing_routine();
+void should_capture_routine();
 
 cv::Mat cvt_camCS_to_markerCS(cv::Mat marker_position);
 cv::Mat get_voxels();

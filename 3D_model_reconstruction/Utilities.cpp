@@ -117,18 +117,6 @@ void get_voxel_coord(int index, int output[3]) {
 	output[2] = z;
 }
 
-void set_candidate_index(int index[pitch_points][yaw_points]) {
-	for (int i = 0; i < pitch_points; i++) {
-		for (int j = 0; j < yaw_points; j++) {
-			candidate_index[i][j] = index[i][j];
-		}
-	}
-}
-
-void get_adjecent_candidate_index(int candidate_index, int output[4]) {
-
-}
-
 
 // ************************************************************************
 // camera move recommendation
@@ -195,10 +183,19 @@ Mat cal_trans_mat(float rx, float ry, float rz, float tx, float ty, float tz) {
 	return trans_mat;
 }
 
+//alpha = yaw
+//beta = roll
+//gamma = pitch
 float cal_pitch(Mat translation) {
 	float beta = asin(-translation.at<float>(2, 0));
 	float gamma = asin(translation.at<float>(2, 1) / cos(beta));
 	return abs(rad_to_deg(gamma));
+}
+
+float cal_yaw(Mat translation) {
+	float beta = asin(-translation.at<float>(2, 0));
+	float alpha = asin(translation.at<float>(1, 0) / cos(beta));
+	return rad_to_deg(alpha);
 }
 
 float cal_3d_distance(Mat first_point, Mat second_point) {
@@ -284,6 +281,17 @@ float rad_to_deg(float rad) {
 	return rad * (180 / M_PI);
 }
 
+
+
+
+// ************************************************************************
+// I like Java
+// ************************************************************************
+
+bool contains(vector<int> v, int element) {
+	if (std::find(v.begin(), v.end(), element) != v.end()) return true;
+	return false;
+}
 
 // ************************************************************************
 // help in debugging and gui

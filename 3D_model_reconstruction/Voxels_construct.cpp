@@ -79,7 +79,7 @@ void display_viewer(void) {
 	glLoadIdentity();
 	//glOrtho(-150,150,-112,112,-1000,1000);  // real viewer
 	//glOrtho(-400, 400, -300, 300, -1000, 1000);  // debug : camera location display
-	gluPerspective(60, (0.0 + prefWidth) / prefHeight, 1, 1000);
+	gluPerspective(60, (0.0 + prefWidth) / prefHeight, 1, 1500);
 	glMatrixMode(GL_MODELVIEW);
 	glLoadIdentity();
 	gluLookAt(200, 200, 700, 0, 0, 0, 0, 1, 0);
@@ -107,6 +107,18 @@ void display_viewer(void) {
 	glColor3f(0.3f, 0.3f, 1.0f);
 	for (int i = 0; i < views->size(); i++) {
 		Mat current_view = trans_opengl * views->at(i);
+		glPushMatrix();
+		Mat current_view_t = current_view.t();
+		glMultMatrixf(current_view_t.ptr<float>());
+		glutSolidCube(5);
+		glPopMatrix();
+	}
+
+	vector<Mat>* rec_cam = get_recommended_acam();
+	glColor3f(0.8f, 0.8f, 1.0f);
+	for (int i = 0; i < rec_cam->size(); i++) {
+		if (get_should_capture_at(i)) continue;
+		Mat current_view = trans_opengl * rec_cam->at(i);
 		glPushMatrix();
 		Mat current_view_t = current_view.t();
 		glMultMatrixf(current_view_t.ptr<float>());
@@ -190,8 +202,8 @@ void construct_depth_map(Mat cam_view, int depth_voxel_id[][prefWidth], float de
 		if (!voxel_valid[i]) continue;
 
 		//get the voxel's x and y location in the image and round to integer
-		int x = round(voxel_2D.at<float>(0, i));
-		int y = round(voxel_2D.at<float>(1, i));
+		int x = voxel_2D.at<float>(0, i);
+		int y = voxel_2D.at<float>(1, i);
 		if (x < 0 || y < 0) continue;
 		if (x > prefWidth - 1 || y > prefHeight - 1) continue;
 
@@ -226,7 +238,7 @@ void construct_depth_map(Mat cam_view, int depth_voxel_id[][prefWidth], float de
 	waitKey(10);
 }
 
-void vd_color_voxel(vector<Mat> cam_views, vector<Mat> images, int id, int x, int y) {
+/*void vd_color_voxel(vector<Mat> cam_views, vector<Mat> images, int id, int x, int y) {
 	update_voxel_validity();
 
 	//reset all windows to unclicked state
@@ -242,9 +254,6 @@ void vd_color_voxel(vector<Mat> cam_views, vector<Mat> images, int id, int x, in
 	Mat voxel_3D = get_voxels();
 
 	//construct the depeth map of the clicked window
-	/*Mat voxel_2D = clicked_multimarker_mat * voxel_3D;
-	Mat z_value_of_voxels = voxel_2D.clone();
-	voxel_2D = cvt_3dPoints_2dPoints_cvmat(voxel_3D, clicked_multimarker_mat, cameraMat);*/
 	construct_depth_map(clicked_multimarker_mat, depth_voxel_id, depth_map);
 
 	//get the voxel that is clicked
@@ -277,8 +286,8 @@ void vd_color_voxel(vector<Mat> cam_views, vector<Mat> images, int id, int x, in
 			voxel_2D = cvt_3dPoints_2dPoints_cvmat(voxel_2D, cloeset_acam_view, get_camera_matrix());
 
 			//get the color at <voxel_2D> on the image to color the voxel
-			int image_x_loc = round(voxel_2D.at<float>(0, 0));
-			int image_y_loc = round(voxel_2D.at<float>(1, 0));
+			int image_x_loc = voxel_2D.at<float>(0, 0);
+			int image_y_loc = voxel_2D.at<float>(1, 0);
 			Vec3b new_color = closest_image.at<Vec3b>(image_y_loc, image_x_loc);
 			voxels_color.at<Vec3b>(0, voxel_id) = new_color;
 			is_voxel_colored[voxel_id] = true; //set colored flag to true
@@ -291,14 +300,11 @@ void vd_color_voxel(vector<Mat> cam_views, vector<Mat> images, int id, int x, in
 		Mat current_view = cam_views.at(i - 1).inv();
 		
 		Mat clicked_voxel_2D = cvt_3dPoints_2dPoints_cvmat(clicked_voxel_3D, current_view, cameraMat);
-		/*voxel_2D = current_view * voxel_3D;
-		z_value_of_voxels = voxel_2D.clone();
-		voxel_2D = cvt_3dPoints_2dPoints_cvmat(voxel_3D, current_view, cameraMat);*/
 		construct_depth_map(current_view, depth_voxel_id, depth_map);
 
 		//get the location of this voxel in other windows
-		int xx = round(clicked_voxel_2D.at<float>(0, 0));
-		int yy = round(clicked_voxel_2D.at<float>(1, 0));
+		int xx = clicked_voxel_2D.at<float>(0, 0);
+		int yy = clicked_voxel_2D.at<float>(1, 0);
 		if (xx < 0 || yy < 0 || xx >= prefWidth || yy >= prefHeight) continue;
 
 		//highlight it with green circle (seen) or red circle (unseen)
@@ -311,7 +317,7 @@ void vd_color_voxel(vector<Mat> cam_views, vector<Mat> images, int id, int x, in
 		ss << i;
 		show_image(ss.str().c_str(), image);
 	}
-}
+}*/
 
 void init_acam_voxel2D() {
 	Mat voxel_3D = get_voxels();
@@ -327,16 +333,60 @@ void init_acam_voxel2D() {
 
 void vd_texture_mapping() {
 	if (!get_is_mapping()) return;
-	clock_t time = clock();
 	std::cout << degree << std::endl;
 	vector<Mat>* captured_images = get_all_captured_image();
 	vector<Mat>* camera_views = get_all_camera_view();
 	Mat shift_origin = get_shift_origin();
 	Mat voxel_3D = get_voxels();
-	clock_t time_2 = clock();
-	std::cout << "getting parameter from AR_routine used " << time_2 - time << std::endl;
+	Mat v_image(480, 640, CV_8UC3);
+	Mat v_cam = construct_vcam();
 
-	time = clock();
+	construct_depth_map(v_cam.inv(), depth_voxel_id, depth_map);
+
+	vector<float> c_values;
+	for (int i = 0; i < camera_views->size(); i++) {
+		float c = cal_3d_sqr_distance(camera_views->at(i) , v_cam);
+		c_values.push_back(c);
+	}
+
+	if (voxel_2D_vec.empty()) init_acam_voxel2D();
+
+	//for each voxel appeared in depth map id
+	for (int y = 0; y < prefHeight; y++) {
+		for (int x = 0; x < prefWidth; x++) {
+			if (depth_voxel_id[y][x] == -1) continue;
+			//find the closest actual camera view and image
+			int voxel_id = depth_voxel_id[y][x];
+			vector<int> c_index = find_closest_view_optimized(voxel_id, v_cam, -1, c_values);
+			
+			int r = 0, g = 0, b = 0;
+			for (int i = 0; i < image_count; i++) {
+				Mat closest_image = captured_images->at(c_index[i]);
+				Mat voxel_2D = voxel_2D_vec[c_index[i]].col(voxel_id);
+				int image_x_loc = voxel_2D.at<float>(0, 0);
+				int image_y_loc = voxel_2D.at<float>(1, 0);
+				if (image_x_loc < 0 || image_y_loc < 0 || image_x_loc > prefWidth - 1 || image_y_loc > prefHeight - 1) continue;
+
+				Vec3b new_color = closest_image.at<Vec3b>(image_y_loc, image_x_loc);
+				r += new_color.val[2] * image_weight[i];
+				g += new_color.val[1] * image_weight[i];
+				b += new_color.val[0] * image_weight[i];
+			}
+
+			Vec3b new_color(b / image_count, g / image_count, r / image_count);
+
+			//get the color at <voxel_2D> on the image to color the voxel
+			voxels_color.at<Vec3b>(0, voxel_id) = new_color;
+			is_voxel_colored[voxel_id] = true; //set colored flag to true
+			v_image.at<Vec3b>(y, x) = new_color;
+		}
+	}
+
+	show_image("v_image", v_image);
+	waitKey(10);
+}
+
+Mat construct_vcam() {
 	float yaw = degree;
 	float pitch = v_cam_pitch;
 	float x = v_cam_sphere_radius * cos(deg_to_rad(yaw)) * sin(deg_to_rad(pitch));
@@ -354,76 +404,8 @@ void vd_texture_mapping() {
 	v_cam = cal_trans_mat(180, 0, 0, 0, 0, 0) * v_cam;
 	v_cam = v_cam.inv();
 	v_cam = from_origin * v_cam;
-	time_2 = clock();
-	std::cout << "define v_cam used " << time_2 - time << std::endl;
 
-	time = clock();
-	construct_depth_map(v_cam.inv(), depth_voxel_id, depth_map);
-	time_2 = clock();
-	std::cout << "construct depth map used " << time_2 - time << std::endl;
-
-	time = clock();
-	Mat v_image(480, 640, CV_8UC3);
-	long sum = 0;
-	long sum2 = 0;
-	
-	vector<float> c_values;
-	for (int i = 0; i < camera_views->size(); i++) {
-		float c = cal_3d_sqr_distance(camera_views->at(i) , v_cam);
-		c_values.push_back(c);
-	}
-	time_2 = clock();
-	std::cout << "preaparing c values " << time_2 - time << std::endl;
-	if (voxel_2D_vec.empty()) init_acam_voxel2D();
-
-	time = clock();
-	//for each voxel appeared in depth map id
-	for (int y = 0; y < prefHeight; y++) {
-		for (int x = 0; x < prefWidth; x++) {
-			if (depth_voxel_id[y][x] == -1) continue;
-			//find the closest actual camera view and image
-			int voxel_id = depth_voxel_id[y][x];
-			clock_t time_l = clock();
-			vector<int> c_index = find_closest_view_optimized(voxel_id, v_cam, -1, c_values);
-			clock_t time_l2 = clock();
-			sum += time_l2 - time_l;
-			//if (!is_visible_in_acam_view(voxel_id, closest_acam_index)) continue;
-			
-			int r = 0, g = 0, b = 0;
-			for (int i = 0; i < image_count; i++) {
-				Mat closest_image = captured_images->at(c_index[i]);
-				Mat voxel_2D = voxel_2D_vec[c_index[i]].col(voxel_id);
-				int image_x_loc = round(voxel_2D.at<float>(0, 0));
-				int image_y_loc = round(voxel_2D.at<float>(1, 0));
-				if (image_x_loc < 0 || image_y_loc < 0 || image_x_loc > prefWidth - 1 || image_y_loc > prefHeight - 1) continue;
-
-				Vec3b new_color = closest_image.at<Vec3b>(image_y_loc, image_x_loc);
-				r += new_color.val[2] * image_weight[i];
-				g += new_color.val[1] * image_weight[i];
-				b += new_color.val[0] * image_weight[i];
-			}
-
-			Vec3b new_color(b / image_count, g / image_count, r / image_count);
-
-			//get the color at <voxel_2D> on the image to color the voxel
-			voxels_color.at<Vec3b>(0, voxel_id) = new_color;
-			is_voxel_colored[voxel_id] = true; //set colored flag to true
-			v_image.at<Vec3b>(y, x) = new_color;
-		}
-	}
-	
-	std::cout << "   find_closest_view " << sum << std::endl;
-	//std::cout << "   cvt_3dPoints_2dPoints_cvmat " << sum2 << std::endl;
-	time_2 = clock();
-	std::cout << "loop though the depth map used " << time_2 - time << std::endl;
-
-	time = clock();
-	std::stringstream ss;
-	//ss << yaw;
-	show_image("v_image", v_image);
-	waitKey(10);
-	time_2 = clock();
-	std::cout << "showing v_image used " << time_2 - time << std::endl;
+	return v_cam;
 }
 
 //find the closest actual view from the v_cam
@@ -466,9 +448,6 @@ vector<int> find_closest_view_optimized(int voxel_id, Mat v_cam, int exclude_id,
 	//get all ACTUAL camera views and accquire 3D voxel location both of these are in MARKER CS
 	vector<Mat>* cam_views = get_all_camera_view();
 	Mat voxel_location = get_voxels().col(voxel_id);
-	//voxel_location = get_shift_origin() * voxel_location;
-	int closest_acam_index = 0;
-	float cosine_deg = 999999;
 
 	float a = cal_3d_sqr_distance(v_cam, voxel_location);
 	for (int i = 0; i < cam_views->size(); i++) {

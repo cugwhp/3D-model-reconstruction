@@ -13,8 +13,6 @@ cv::Mat extract_rotation_mat(cv::Mat input);
 // coverting index
 int get_voxel_index(int x, int y, int z);
 void get_voxel_coord(int index, int output[3]);
-void set_candidate_index(int index[pitch_points][yaw_points]);
-void get_adjecent_candidate_index(int candidate_index, int output[4]);
 
 // camera move recommendation
 int get_acam_start_index(int pitch_layer, int total_acam);
@@ -25,6 +23,7 @@ float get_pitch_layer_end(int pitch_layer);
 // distance and translation/rotation matrix generation
 cv::Mat cal_trans_mat(float rx, float ry, float rz, float tx, float ty, float tz);
 float cal_pitch(cv::Mat translation);
+float cal_yaw(cv::Mat translation);
 float cal_3d_distance(cv::Mat first_point, cv::Mat second_point);
 float cal_3d_sqr_distance(cv::Mat first_point, cv::Mat second_point);
 float cal_color3c_sqr_distance(cv::Vec3b first_color, cv::Vec3b second_color);
@@ -36,6 +35,9 @@ float var(float mean, std::vector<float> data);
 float percentile(float percentile, std::vector<float> data);
 float deg_to_rad(float degree);
 float rad_to_deg(float rad);
+
+// I like Java
+bool contains(std::vector<int> v, int element);
 
 // help in debugging and gui
 void show_image(const char* name, cv::Mat image);

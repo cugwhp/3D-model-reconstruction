@@ -26,6 +26,7 @@
 #include "ar_routine.h"
 #include "voxel_construct.h"
 #include "constants.h"
+#include "capturing.h"
 
 #include <AR/gsub_lite.h>
 #include <GL/glut.h>
@@ -78,9 +79,14 @@ int main(int argc, char** argv) {
 	glutReshapeFunc(reshape_viewer);
 
 	auto voxel_t = std::thread(voxel_carving_routine);
-	auto texture_t = std::thread(image_capturing_routine);
+	auto capture_t = std::thread(image_capturing_routine);
+	auto should_capture_t = std::thread(should_capture_routine);
+	auto a_cam_buffer_t = std::thread(transfer);
+	
 	voxel_t.detach();
-	texture_t.detach();
+	capture_t.detach();
+	should_capture_t.detach();
+	a_cam_buffer_t.detach();
 	glutMainLoop();
 
 	return 0;

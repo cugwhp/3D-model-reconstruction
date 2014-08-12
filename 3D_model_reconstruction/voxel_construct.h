@@ -15,6 +15,7 @@ void construct_depth_map(cv::Mat cam_view, int depth_voxel_id[][prefWidth], floa
 void color_voxel(cv::Mat current_frame, cv::Mat voxel_2D);
 void vd_color_voxel(std::vector<cv::Mat> cam_views, std::vector<cv::Mat> a_cam_images, int id, int x, int y);
 void vd_texture_mapping();
+cv::Mat construct_vcam();
 int find_closest_view(int voxel_id, cv::Mat v_cam, int exclude_id=-1);
 std::vector<int> find_closest_view_optimized(int voxel_id, cv::Mat v_cam, int exclude_id, std::vector<float> c_values);
 void cal_depth_id_acam();
