@@ -41,6 +41,7 @@ int temp_clicked_voxel_id = -1;
 vector<Mat> acam_depth_idmap;
 vector<Mat> voxel_2D_vec;
 bool is_voxel_colored[total_voxel] = { };				// true if the voxel is already colored, false otherwise
+bool ready = false;
 
 void init_voxels_hp() {
 	std::fill_n(voxel_hp, total_voxel, voxel_max_hp);
@@ -319,20 +320,54 @@ void construct_depth_map(Mat cam_view, int depth_voxel_id[][prefWidth], float de
 	}
 }*/
 
+void finish_capturing() {
+	if (voxel_2D_vec.empty()) init_acam_voxel2D();
+
+	vector<Mat>* a_cam_views = get_all_camera_view();
+	vector<Mat>* a_cam_images = get_all_captured_image();
+	for (int i = 0 ; i < a_cam_views->size() ; i++) {
+		float bound[4] = {999999, 0, 999999, 0}; //min_x max_x min_y max_y
+		clock_t t = clock();
+		find_voxel_bound(voxel_2D_vec[i], bound);
+		clock_t t2 = clock();
+		std::cout << "find_voxel_bound " << t2-t << std::endl;
+		int w = bound[1] - bound[0];
+		int h = bound[3] - bound[2];
+		Mat current_image = (*a_cam_images)[i];
+		Mat mask;
+		Mat bg_model, fg_model;
+		Rect poi(bound[0], bound[2], w, h);
+		std::cout << bound[0] << " " << bound[1] << " "<< bound[2] << " "<< bound[3] <<std::endl;
+		t = clock();
+		grabCut(current_image, mask, poi, bg_model, fg_model, 3, GC_INIT_WITH_RECT);
+
+		mask = mask & 1;
+		Mat result(current_image.size(), current_image.type());
+		current_image.copyTo(result, mask);
+		t2 = clock();
+		std::cout << "grabcut " << t2-t << std::endl;
+
+		rectangle(current_image, poi, Scalar(0,0,255), 3);
+		(*a_cam_images)[i] = result;
+		show_image("cut", result);
+		show_image("ori", current_image);
+		waitKey(10);
+	}
+
+	ready = true;
+}
+
 void init_acam_voxel2D() {
 	Mat voxel_3D = get_voxels();
 	vector<Mat>* camera_views = get_all_camera_view();
 
-	clock_t time = clock();
 	for (int i = 0; i < camera_views->size(); ++i){
 		voxel_2D_vec.push_back(cvt_3dPoints_2dPoints_cvmat(voxel_3D, (*camera_views)[i].inv(), get_camera_matrix()));
 	}
-	clock_t time_2 = clock();
-	std::cout << "preaparing voxel_2D_vec " << time_2 - time << std::endl;
 }
 
 void vd_texture_mapping() {
-	if (!get_is_mapping()) return;
+	if (!get_is_mapping() && !ready) return;
 	std::cout << degree << std::endl;
 	vector<Mat>* captured_images = get_all_captured_image();
 	vector<Mat>* camera_views = get_all_camera_view();
@@ -348,8 +383,6 @@ void vd_texture_mapping() {
 		float c = cal_3d_sqr_distance(camera_views->at(i) , v_cam);
 		c_values.push_back(c);
 	}
-
-	if (voxel_2D_vec.empty()) init_acam_voxel2D();
 
 	//for each voxel appeared in depth map id
 	for (int y = 0; y < prefHeight; y++) {
@@ -481,6 +514,16 @@ vector<int> find_closest_view_optimized(int voxel_id, Mat v_cam, int exclude_id,
 	return closest_index;
 }
 
+void find_voxel_bound(Mat input, float output[4]) {
+	for (int i = 0; i < input.cols; i++) {
+		if (!voxel_valid[i]) continue;
+		if (input.at<float>(0, i) < output[0]) output[0] = input.at<float>(0, i);
+		else if (input.at<float>(0, i) > output[1]) output[1] = input.at<float>(0, i);
+
+		if (input.at<float>(1, i) < output[2]) output[2] = input.at<float>(1, i);
+		else if (input.at<float>(1, i) > output[3]) output[3] = input.at<float>(1, i);
+	}
+}
 /*void cal_depth_id_acam() {
 	vector<Mat> acams = get_all_camera_view();
 	std::cout << acam_depth_idmap.size()<< " " <<acams.size() << std::endl;

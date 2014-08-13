@@ -370,9 +370,10 @@ void image_capturing_routine() {
 
 void should_capture_routine() {
 	for (;;) {
-		if (patt_found && !is_mapping)
-		update_voxel_validity();
-		should_capture_or_not(cvt_trans_mat_to_cvmat(multimarker_info->trans).inv());
+		if (patt_found && !is_mapping) {
+			update_voxel_validity();
+			should_capture_or_not(cvt_trans_mat_to_cvmat(multimarker_info->trans).inv());
+		}
 	}
 }
 
@@ -383,5 +384,6 @@ void debug_only(unsigned char key, int x, int y) {
 		//vd_texture_mapping();
 		is_mapping = !is_mapping;
 		update_voxel_validity();
+		finish_capturing();
 	}
 }
