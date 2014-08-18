@@ -305,7 +305,7 @@ void voxel_carving_routine() {
 	for (;;) {
 		if (patt_found && !is_mapping) {
 			Mat points2D = cvt_3dPoints_2dPoints_array(voxels, multimarker_info->trans, arParam.mat);
-			if (determine_bgColor(current_frame_cvmat) || override_bg_warning) {
+			if (determine_bgColor(current_frame_cvmat)) {
 				is_bg_ok = TRUE;
 				Mat silhouette = create_silhouette(current_frame_cvmat);
 				shape_voxels(current_frame_cvmat, points2D, silhouette);
