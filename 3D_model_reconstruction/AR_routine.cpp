@@ -70,7 +70,6 @@ void camera_set_context(ARGL_CONTEXT_SETTINGS_REF ar_context) {
 void setup_voxels() {
 	setup_default_bgColor();
 	int i = 0;
-
 	for (int x = first_voxel_x; x <= last_voxel_x; x++) {
 		for (int y = first_voxel_y; y <= last_voxel_y; y++) {
 			for (int z = first_voxel_z; z <= last_voxel_z; z++) {
@@ -229,7 +228,7 @@ void drawHUD() {
 void draw() {
 	glPushMatrix();
 
-	glColor3ub(255, 30, 30);
+	/*glColor3ub(255, 30, 30);
 	glPointSize(10.0f);
 	glBegin(GL_LINES);
 	vector<Mat>* recommended_acam = get_recommended_acam();
@@ -261,45 +260,7 @@ void draw() {
 	trans = cal_trans_mat(0, 0, -90, 0, 0, 0) * trans;
 	trans = cal_trans_mat(180, 0, 0, 0, 0, 0) * trans;
 	trans = trans.inv();
-	trans = from_origin * trans;
-	//std::cout << yaw << " " << pitch << " " << x << " " << y << " " << z << std::endl;
-
-	/*glPointSize(10.0f);
-	glBegin(GL_POINTS);
-	y = 300 * cos(deg_to_rad(carving_pitch_start));
-	glColor3ub(0, 255, 0);
-	glVertex3f(0, 0, y);
-	y = 300 * cos(deg_to_rad(carving_pitch_end));
-	glColor3ub(255, 0, 0);
-	glVertex3f(0, 0, y);
-	glEnd();*/
-
-	/*trans = trans.t();
-	glPushMatrix();
-	glMultMatrixf(trans.ptr<float>());
-	glutSolidCube(10);
-	glBegin(GL_LINES);
-	glColor3ub(255, 0, 0);
-	glVertex3f(-500, 0, 0);
-	glVertex3f(500, 0, 0);
-	glColor3ub(0, 255, 0);
-	glVertex3f(0, -500, 0);
-	glVertex3f(0, 500, 0);
-	glColor3ub(0, 0, 255);
-	glVertex3f(0, 0, -500);
-	glVertex3f(0, 0, 500);
-	glEnd();
-
-	glPointSize(5.0f);
-	glBegin(GL_POINTS);
-	glColor3ub(255, 0, 0);
-	glVertex3f(20, 0, 0);
-	glColor3ub(0, 255, 0);
-	glVertex3f(0, 20, 0);
-	glColor3ub(0, 0, 255);
-	glVertex3f(0, 0, 20);
-	glEnd();
-	glPopMatrix();*/
+	trans = from_origin * trans;*/
 
 	glPopMatrix();
 }
@@ -344,12 +305,12 @@ void voxel_carving_routine() {
 	for (;;) {
 		if (patt_found && !is_mapping) {
 			Mat points2D = cvt_3dPoints_2dPoints_array(voxels, multimarker_info->trans, arParam.mat);
-			//if (determine_bgColor(current_frame_cvmat)) {
+			if (determine_bgColor(current_frame_cvmat) || override_bg_warning) {
 				is_bg_ok = TRUE;
 				Mat silhouette = create_silhouette(current_frame_cvmat);
 				shape_voxels(current_frame_cvmat, points2D, silhouette);
-			//}
-			//else is_bg_ok = FALSE;
+			}
+			else is_bg_ok = FALSE;
 		}
 	}
 }
@@ -379,9 +340,6 @@ void should_capture_routine() {
 
 void debug_only(unsigned char key, int x, int y) {
 	if (key == ' ') {
-		//auto texture_mapping_t = std::thread(vd_texture_mapping);
-		//texture_mapping_t.detach();
-		//vd_texture_mapping();
 		is_mapping = !is_mapping;
 		update_voxel_validity();
 		finish_capturing();

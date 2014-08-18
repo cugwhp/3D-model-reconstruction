@@ -87,6 +87,7 @@ int main(int argc, char** argv) {
 	capture_t.detach();
 	should_capture_t.detach();
 	a_cam_buffer_t.detach();
+
 	glutMainLoop();
 
 	return 0;

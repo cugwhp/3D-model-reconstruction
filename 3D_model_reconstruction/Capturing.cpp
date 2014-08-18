@@ -20,28 +20,27 @@
 
 using namespace cv;
 
+// capturing
 vector<Mat> a_cam_views;								// contains all of the translation mat for all captured view in MARKER CS
 vector<Mat> a_cam_images;								// contains all of the images captured so far NOTE: the index is coresponding to a_cam_views
-vector<Mat> recommended_acam;							// list of defined virtual camera transformation matrix in MARKER CS
-vector<Mat> in_range_voxel_2D;
+vector<bool> is_captured;								// [flag] true when that view is already captured
+int captured_count = 0;									// how many the images captured so far
 std::queue<Mat> a_cam_views_q;
 std::queue<Mat> a_cam_images_q;
 std::mutex mtx;
 
-vector<bool> is_captured;								// [flag] true when that view is already captured
-vector<bool> should_capture;							// [flag] true when that view is worth capture
+// camera movement recommendation
+vector<Mat> recommended_acam;							// list of defined virtual camera transformation matrix in MARKER CS
 bool is_carving_pitch_done = false;						// [flag] will be ture iff all of the recommended view in carving layer are already captured
 bool pitch_layer_done[pitch_points];					// [flag] true if all of recommended view in that layer are already captured
 bool is_capturing_done = false;							// [flag] all of the layer are complete
 int recommended_layer = carving_pitch;					// recommended pitch layer
-int captured_count = 0;									// how many the images captured so far
 
+// 'should capture or not' suggesstion
+vector<Mat> in_range_voxel_2D;							// voxel 2D location of the in-ranged actual cameras
+vector<bool> should_capture;							// [flag] true when that view is worth capture
 int depth_voxel_id_capture[prefHeight][prefWidth];		// the id is start at 0, -1 for not having any voxel
 float depth_map_capture[prefHeight][prefWidth];			// the depth value of each voxel in specific frame
-
-
-vector<Mat> voxel_2D_vec_temp;
-
 
 
 // find the closest recommended acam view based on current user's camera position
@@ -67,8 +66,6 @@ void find_closest_acam(Mat current_cam, Mat current_frame) {
 	float distance = cal_3d_point2line_distance(zero, recommended_acam[closest_rec_acam_index].col(3), current_cam.col(3));
 	//std::cout << distance << std::endl;
 	if (distance < capture_trigger_distance) {
-		std::cout << "captured : " << closest_rec_acam_index << " " << captured_count << " " << recommended_acam[closest_rec_acam_index].at<float>(2, 3) << std::endl;
-		std::cout << recommended_layer << std::endl;
 		capture_image(current_cam, current_frame, closest_rec_acam_index);
 	}
 }
@@ -76,14 +73,15 @@ void find_closest_acam(Mat current_cam, Mat current_frame) {
 // this function called by find_closest_acam
 // called when the user's camera and the closest recommended camera is close enough
 void capture_image(Mat current_cam, Mat current_frame, int closest_rec_acam_index) {
-	//a_cam_views.push_back(current_cam);
-	//a_cam_images.push_back(current_frame);
+	std::cout << "captured : " << closest_rec_acam_index << " " << captured_count << " " << recommended_acam[closest_rec_acam_index].at<float>(2, 3) << std::endl;
+	std::cout << recommended_layer << std::endl;
 	a_cam_views_q.push(current_cam);
 	a_cam_images_q.push(current_frame);
 	is_captured[closest_rec_acam_index] = true;
 	captured_count++;
 }
 
+// this function prevent the thread of variable accessing colision
 void transfer() {
 	for (;;) {
 		Mat cam, img;
@@ -121,13 +119,10 @@ void should_capture_or_not(Mat user_camera_position) {
 	std::cout << acam_in_range.size() << " acam in range" << std::endl;
 
 	mtx.lock();
-	//voxel2D();
 	int count = 0;
 	for (int i = 0; i < candidate_in_range.size(); i++) {
 		int current_rec_cam = candidate_in_range.at(i);
-		//std::cout << "rec_cam id " << current_rec_cam << std::endl;
 		Mat current_candidate = recommended_acam.at(current_rec_cam).inv();
-		//vd_texture_mapping_temp(current_candidate);
 		
 		construct_depth_map(current_candidate, depth_voxel_id_capture, depth_map_capture);
 		
@@ -275,7 +270,6 @@ vector<int> find_closest_view_ranged(int voxel_id, Mat v_cam, vector<float> c_va
 int suggest_direction(Mat current_view) {
 	if (is_capturing_done) return DONE;
 	float cam_pitch = cal_pitch(current_view);
-	//std::cout << cam_pitch << " " << get_pitch_layer_end(recommended_layer) << " " << get_pitch_layer_start(recommended_layer) << std::endl;
 	float recommended_layer_pitch_end = get_pitch_layer_end(recommended_layer);
 	float recommended_layer_pitch_start = get_pitch_layer_start(recommended_layer);
 

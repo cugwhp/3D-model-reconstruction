@@ -29,6 +29,8 @@ const int last_voxel_y = (first_voxel_y + voxel_y) - 1;		// the co-ordinate on y
 const int last_voxel_z = (first_voxel_z + voxel_z) - 1;		// the co-ordinate on z axis of last voxels to be drawn
 const int total_voxel = voxel_x * voxel_y * voxel_z;		// total number of voxels
 
+const bool override_bg_warning = true;
+
 
 /************************************************
         +-------------------------------+
@@ -56,15 +58,19 @@ const int erosion_size = 3;					// size of the erosion
 //voxel model construction
 const int voxel_max_hp = 10;				// 'hp' of each voxel
 const char voxel_hp_regen_rate = 5;			// if regen hit this value, that voxel regenerate its hp by 1
-const int voxel_size = 5;					// for doing a depth test, need to be odd number
+const int voxel_size = 3;					// for doing a depth test, need to be odd number
 
 //view dependence texture mapping
 const float v_cam_sphere_radius = 350.0;	// the radius of the sphere centered at marker origin (middle of the marker)
 const float v_cam_pitch = 90 - 45.0;		// pitch of the virtual camera, to change the pitch change the second number
 
+//color blending
 const int image_count = 3;					// the number of images used for getting color of one voxel
 const float image_weight[image_count] = { 1.5, 1.0, 0.5 };	// weight for each image for getting color of one voxel
 
+//grabcuting the captured image
+const int grabcut_iter = 5;					// the number of grabcut iteration
+const int object_border_expand = 5;			// expand the border of the rectangle passed to the grabcut to prevent any clipping of the real object
 
 
 /************************************************
